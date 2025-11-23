@@ -22,9 +22,10 @@ type disksDataSource struct {
 }
 
 type disksDataSourceModel struct {
-	ID    types.String   `tfsdk:"id"`
-	Ids   []types.String `tfsdk:"ids"`
-	Disks []diskModel    `tfsdk:"disks"`
+	ID       types.String           `tfsdk:"id"`
+	Ids      []types.String         `tfsdk:"ids"`
+	Disks    []diskModel            `tfsdk:"disks"`
+	BySerial map[string]diskModel   `tfsdk:"by_serial"`
 }
 
 type diskModel struct {
@@ -52,6 +53,26 @@ func (d *disksDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 			},
 			"disks": schema.ListNestedAttribute{
 				Computed: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Computed: true,
+						},
+						"serial": schema.StringAttribute{
+							Computed: true,
+						},
+						"size": schema.Int64Attribute{
+							Computed: true,
+						},
+						"type": schema.StringAttribute{
+							Computed: true,
+						},
+					},
+				},
+			},
+			"by_serial": schema.MapNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Map of disks keyed by serial number for stable references.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
@@ -107,6 +128,7 @@ func (d *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 
 	var ids []types.String
 	var diskModels []diskModel
+	bySerial := make(map[string]diskModel)
 
 	for _, disk := range disks {
 		name := disk["name"].(string)
@@ -123,18 +145,24 @@ func (d *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			dtype = t
 		}
 
-		ids = append(ids, types.StringValue(name))
-		diskModels = append(diskModels, diskModel{
+		model := diskModel{
 			Name:   types.StringValue(name),
 			Serial: types.StringValue(serial),
 			Size:   types.Int64Value(size),
 			Type:   types.StringValue(dtype),
-		})
+		}
+
+		ids = append(ids, types.StringValue(name))
+		diskModels = append(diskModels, model)
+		if serial != "" {
+			bySerial[serial] = model
+		}
 	}
 
 	data.ID = types.StringValue("disks")
 	data.Ids = ids
 	data.Disks = diskModels
+	data.BySerial = bySerial
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
