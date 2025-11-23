@@ -206,10 +206,13 @@ func (r *poolResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 				vdevType := ""
 				if t, ok := vdevMap["type"].(string); ok {
 					vdevType = t
+					if vdevType == "DISK" {
+						vdevType = "STRIPE"
+					}
 				}
 
 				var disks []types.String
-				if children, ok := vdevMap["children"].([]any); ok {
+				if children, ok := vdevMap["children"].([]any); ok && len(children) > 0 {
 					for _, c := range children {
 						if childMap, ok := c.(map[string]any); ok {
 							if disk, ok := childMap["disk"].(string); ok {
@@ -217,6 +220,8 @@ func (r *poolResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 							}
 						}
 					}
+				} else if disk, ok := vdevMap["disk"].(string); ok {
+					disks = append(disks, types.StringValue(disk))
 				}
 
 				vdevs = append(vdevs, vdevModel{

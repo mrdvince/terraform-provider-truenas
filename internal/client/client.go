@@ -64,7 +64,7 @@ func NewClient(host, apiKey string) (*Client, error) {
 
 	conn, _, err := dialer.Dial(url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to connect to websocket: %w", err)
+		return nil, fmt.Errorf("failed to connect to websocket: %w", err)
 	}
 
 	c := &Client{
@@ -104,14 +104,15 @@ func (c *Client) readLoop() {
 			continue
 		}
 
-		if resp.Msg == "result" || resp.Msg == "method" { // method return or result
+		switch resp.Msg {
+		case "result", "method":
 			c.mu.Lock()
 			ch, ok := c.pending[resp.ID]
 			c.mu.Unlock()
 			if ok {
 				ch <- &resp
 			}
-		} else if resp.Msg == "connected" {
+		case "connected":
 			close(c.connected)
 		}
 	}
@@ -135,7 +136,7 @@ func (c *Client) connect() error {
 	case <-c.connected:
 		return nil
 	case <-time.After(5 * time.Second):
-		return fmt.Errorf("Timeout waiting for connected message")
+		return fmt.Errorf("timeout waiting for connected message")
 	}
 }
 
@@ -172,13 +173,13 @@ func (c *Client) Call(ctx context.Context, method string, params []any) (*Respon
 	select {
 	case resp := <-ch:
 		if resp.Error != nil {
-			return nil, fmt.Errorf("API error: %s (code %d)", resp.Error.Error, resp.Error.ErrCode)
+			return nil, fmt.Errorf("api error: %s (code %d)", resp.Error.Error, resp.Error.ErrCode)
 		}
 		return resp, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-time.After(10 * time.Second):
-		return nil, fmt.Errorf("Timeout waiting for response to %s", method)
+		return nil, fmt.Errorf("timeout waiting for response to %s", method)
 	}
 }
 
@@ -208,9 +209,10 @@ func (c *Client) WaitForJob(ctx context.Context, jobID int64) error {
 			job := jobs[0]
 			state := job["state"].(string)
 
-			if state == "SUCCESS" {
+			switch state {
+			case "SUCCESS":
 				return nil
-			} else if state == "FAILED" {
+			case "FAILED":
 				return fmt.Errorf("job failed: %v", job["error"])
 			}
 		}
