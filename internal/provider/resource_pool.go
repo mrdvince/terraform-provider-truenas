@@ -11,13 +11,39 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 var _ resource.Resource = &poolResource{}
+
+type useStateIfExistsModifier struct{}
+
+func (m useStateIfExistsModifier) Description(ctx context.Context) string {
+	return "use state value if resource already exists, unless force_recreate is set"
+}
+
+func (m useStateIfExistsModifier) MarkdownDescription(ctx context.Context) string {
+	return "use state value if resource already exists, unless force_recreate is set"
+}
+
+func (m useStateIfExistsModifier) PlanModifyList(ctx context.Context, req planmodifier.ListRequest, resp *planmodifier.ListResponse) {
+	if req.StateValue.IsNull() {
+		return
+	}
+
+	var forceRecreate types.Bool
+	req.Config.GetAttribute(ctx, path.Root("force_recreate"), &forceRecreate)
+	if !forceRecreate.IsNull() && forceRecreate.ValueBool() {
+		if !req.ConfigValue.Equal(req.StateValue) {
+			resp.RequiresReplace = true
+		}
+		return
+	}
+
+	resp.PlanValue = req.StateValue
+}
 
 func NewPoolResource() resource.Resource {
 	return &poolResource{}
@@ -28,9 +54,10 @@ type poolResource struct {
 }
 
 type poolResourceModel struct {
-	ID       types.String   `tfsdk:"id"`
-	Name     types.String   `tfsdk:"name"`
-	Topology *topologyModel `tfsdk:"topology"`
+	ID            types.String   `tfsdk:"id"`
+	Name          types.String   `tfsdk:"name"`
+	ForceRecreate types.Bool     `tfsdk:"force_recreate"`
+	Topology      *topologyModel `tfsdk:"topology"`
 }
 
 type topologyModel struct {
@@ -52,12 +79,19 @@ func (r *poolResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"name": schema.StringAttribute{
 				Required: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
+			},
+			"force_recreate": schema.BoolAttribute{
+				Optional:            true,
+				MarkdownDescription: "when true, disables state preservation for disks allowing config changes to trigger recreation.",
 			},
 		},
 		Blocks: map[string]schema.Block{
@@ -74,10 +108,12 @@ func (r *poolResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 									},
 								},
 								"disks": schema.ListAttribute{
-									ElementType: types.StringType,
-									Required:    true,
+									ElementType:         types.StringType,
+									Optional:            true,
+									Computed:            true,
+									MarkdownDescription: "disks in this vdev. only used during creation; subsequent reads reflect actual pool state.",
 									PlanModifiers: []planmodifier.List{
-										listplanmodifier.RequiresReplace(),
+										useStateIfExistsModifier{},
 									},
 								},
 							},
