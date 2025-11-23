@@ -4,23 +4,21 @@ import (
 	"context"
 	"os"
 
+	"truenas/internal/client"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"truenas/internal/client"
 )
 
-// ensure truenasprovider satisfies various provider interfaces.
 var _ provider.Provider = &truenasProvider{}
 
-// truenasprovider defines the provider implementation.
 type truenasProvider struct {
 	version string
 }
 
-// truenasprovidermodel describes the provider data model.
 type truenasProviderModel struct {
 	ApiKey types.String `tfsdk:"api_key"`
 	Host   types.String `tfsdk:"host"`
@@ -74,16 +72,16 @@ func (p *truenasProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 	if host == "" {
 		resp.Diagnostics.AddError(
-			"missing host configuration",
-			"the truenas host url was not found in the configuration or environment variable TRUENAS_HOST.",
+			"Missing host configuration",
+			"The TrueNAS host URL was not found in the configuration or environment variable TRUENAS_HOST.",
 		)
 		return
 	}
 
 	if apiKey == "" {
 		resp.Diagnostics.AddError(
-			"missing api key configuration",
-			"while configuring the provider, the api key was not found in the configuration or environment variable truenas_dev_key.",
+			"Missing API key configuration",
+			"The API key was not found in the configuration or environment variable TRUENAS_DEV_KEY.",
 		)
 		return
 	}
@@ -91,8 +89,8 @@ func (p *truenasProvider) Configure(ctx context.Context, req provider.ConfigureR
 	c, err := client.NewClient(host, apiKey)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"unable to create truenas client",
-			"an error occurred when creating the truenas client: "+err.Error(),
+			"Unable to create TrueNAS client",
+			"An error occurred when creating the TrueNAS client: "+err.Error(),
 		)
 		return
 	}
@@ -102,12 +100,15 @@ func (p *truenasProvider) Configure(ctx context.Context, req provider.ConfigureR
 }
 
 func (p *truenasProvider) Resources(ctx context.Context) []func() resource.Resource {
-	return []func() resource.Resource{}
+	return []func() resource.Resource{
+		NewPoolResource,
+	}
 }
 
 func (p *truenasProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewSystemVersionDataSource,
+		NewDisksDataSource,
 	}
 }
 

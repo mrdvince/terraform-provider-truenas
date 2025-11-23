@@ -24,10 +24,10 @@ type Client struct {
 }
 
 type Request struct {
-	ID     string        `json:"id"`
-	Msg    string        `json:"msg"`
-	Method string        `json:"method,omitempty"`
-	Params []interface{} `json:"params,omitempty"`
+	ID     string `json:"id"`
+	Msg    string `json:"msg"`
+	Method string `json:"method,omitempty"`
+	Params []any  `json:"params,omitempty"`
 }
 
 type Response struct {
@@ -56,14 +56,15 @@ func NewClient(host, apiKey string) (*Client, error) {
 		url = fmt.Sprintf("ws%s/websocket", host[4:])
 	}
 
+	// TODO: make TLS verification configurable
 	dialer := websocket.Dialer{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // dev environment
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		Proxy:           http.ProxyFromEnvironment,
 	}
 
 	conn, _, err := dialer.Dial(url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to websocket: %w", err)
+		return nil, fmt.Errorf("Failed to connect to websocket: %w", err)
 	}
 
 	c := &Client{
@@ -74,15 +75,12 @@ func NewClient(host, apiKey string) (*Client, error) {
 		connected: make(chan struct{}),
 	}
 
-	// start reading loop
 	go c.readLoop()
 
-	// initial connect handshake
 	if err := c.connect(); err != nil {
 		return nil, err
 	}
 
-	// authenticate
 	if err := c.auth(); err != nil {
 		return nil, err
 	}
@@ -95,14 +93,14 @@ func (c *Client) readLoop() {
 	for {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
-			log.Printf("read error: %v", err)
+			log.Printf("Read error: %v", err)
 			return
 		}
-		log.Printf("DEBUG: received message: %s", string(message))
+		log.Printf("DEBUG: Received message: %s", string(message))
 
 		var resp Response
 		if err := json.Unmarshal(message, &resp); err != nil {
-			log.Printf("unmarshal error: %v", err)
+			log.Printf("Unmarshal error: %v", err)
 			continue
 		}
 
@@ -120,9 +118,9 @@ func (c *Client) readLoop() {
 }
 
 func (c *Client) connect() error {
-	// truenas expects a "connect" message first
+	// truenas websocket protocol requires a connect handshake first
 	// { "msg": "connect", "version": "1", "support": ["1"] }
-	req := map[string]interface{}{
+	req := map[string]any{
 		"msg":     "connect",
 		"version": "1",
 		"support": []string{"1"},
@@ -135,18 +133,18 @@ func (c *Client) connect() error {
 	// wait for the "connected" message from the server
 	select {
 	case <-c.connected:
-		return nil // successfully connected
-	case <-time.After(5 * time.Second): // timeout after 5 seconds
-		return fmt.Errorf("timeout waiting for connected message")
+		return nil
+	case <-time.After(5 * time.Second):
+		return fmt.Errorf("Timeout waiting for connected message")
 	}
 }
 
 func (c *Client) auth() error {
-	_, err := c.Call(context.Background(), "auth.login_with_api_key", []interface{}{c.apiKey})
+	_, err := c.Call(context.Background(), "auth.login_with_api_key", []any{c.apiKey})
 	return err
 }
 
-func (c *Client) Call(ctx context.Context, method string, params []interface{}) (*Response, error) {
+func (c *Client) Call(ctx context.Context, method string, params []any) (*Response, error) {
 	id := c.newID()
 	ch := make(chan *Response, 1)
 
@@ -174,13 +172,48 @@ func (c *Client) Call(ctx context.Context, method string, params []interface{}) 
 	select {
 	case resp := <-ch:
 		if resp.Error != nil {
-			return nil, fmt.Errorf("api error: %s (code %d)", resp.Error.Error, resp.Error.ErrCode)
+			return nil, fmt.Errorf("API error: %s (code %d)", resp.Error.Error, resp.Error.ErrCode)
 		}
 		return resp, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-time.After(10 * time.Second):
-		return nil, fmt.Errorf("timeout waiting for response to %s", method)
+		return nil, fmt.Errorf("Timeout waiting for response to %s", method)
+	}
+}
+
+func (c *Client) WaitForJob(ctx context.Context, jobID int64) error {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			resp, err := c.Call(ctx, "core.get_jobs", []any{[]any{[]any{"id", "=", jobID}}})
+			if err != nil {
+				return fmt.Errorf("failed to poll job %d: %w", jobID, err)
+			}
+
+			var jobs []map[string]any
+			if err := json.Unmarshal(resp.Result, &jobs); err != nil {
+				return fmt.Errorf("failed to parse job status: %w", err)
+			}
+
+			if len(jobs) == 0 {
+				return fmt.Errorf("job %d not found", jobID)
+			}
+
+			job := jobs[0]
+			state := job["state"].(string)
+
+			if state == "SUCCESS" {
+				return nil
+			} else if state == "FAILED" {
+				return fmt.Errorf("job failed: %v", job["error"])
+			}
+		}
 	}
 }
 
