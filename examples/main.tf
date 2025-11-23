@@ -20,17 +20,17 @@ output "disks_by_serial" {
   value = data.truenas_disks.all.by_serial
 }
 
-resource "truenas_pool" "tank" {
-  name = "tank"
+resource "truenas_pool" "storage" {
+  name           = "storage"
   force_recreate = true
   topology {
     data {
-      type  = "STRIPE"
-      disks = [data.truenas_disks.all.ids[0]]
+      type  = "RAIDZ2"
+      disks = data.truenas_disks.all.ids
     }
   }
 }
 
 output "pool_id" {
-  value = truenas_pool.tank.id
+  value = truenas_pool.storage.id
 }

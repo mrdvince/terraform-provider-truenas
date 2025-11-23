@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"truenas/internal/client"
 
@@ -142,11 +143,44 @@ func (r *poolResource) Configure(ctx context.Context, req resource.ConfigureRequ
 	r.client = client
 }
 
+func (r *poolResource) waitForSystemDataset(ctx context.Context) error {
+	for {
+		filters := []any{
+			[]any{"method", "=", "systemdataset.update"},
+			[]any{"state", "=", "RUNNING"},
+		}
+		apiResp, err := r.client.Call(ctx, "core.get_jobs", []any{filters})
+		if err != nil {
+			return fmt.Errorf("failed to query running jobs: %w", err)
+		}
+
+		var jobs []map[string]any
+		if err := json.Unmarshal(apiResp.Result, &jobs); err != nil {
+			return fmt.Errorf("failed to parse jobs response: %w", err)
+		}
+
+		if len(jobs) == 0 {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
 func (r *poolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data poolResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if err := r.waitForSystemDataset(ctx); err != nil {
+		resp.Diagnostics.AddError("Client error", fmt.Sprintf("Error waiting for system dataset: %s", err))
 		return
 	}
 
@@ -286,6 +320,11 @@ func (r *poolResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if err := r.waitForSystemDataset(ctx); err != nil {
+		resp.Diagnostics.AddError("Client error", fmt.Sprintf("Error waiting for system dataset: %s", err))
 		return
 	}
 
