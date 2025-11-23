@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-
 	"truenas/internal/client"
 )
 
@@ -22,24 +22,26 @@ func main() {
 		apiKey = os.Getenv("truenas_dev_key")
 	}
 
-	if apiKey == "" {
-		log.Fatal("TRUENAS_DEV_KEY or truenas_dev_key must be set")
-	}
-
-	fmt.Printf("Connecting to %s with key %s...\n", host, apiKey[:5]+"...")
-
 	c, err := client.NewClient(host, apiKey)
 	if err != nil {
-		log.Fatalf("Failed to create client: %v", err)
+		log.Fatalf("failed to create client: %v", err)
 	}
 
-	fmt.Println("Client created and authenticated!")
+	ctx := context.Background()
 
-	// try to get system info
-	resp, err := c.Call(context.Background(), "system.info", nil)
+	fmt.Println("Querying unused disks...")
+	resp, err := c.Call(ctx, "disk.get_unused", nil)
 	if err != nil {
-		log.Fatalf("Failed to call system.info: %v", err)
+		log.Fatalf("disk.get_unused failed: %v", err)
 	}
 
-	fmt.Printf("System Info: %s\n", string(resp.Result))
+	var disks []map[string]any
+	if err := json.Unmarshal(resp.Result, &disks); err != nil {
+		log.Fatalf("failed to parse disks: %v", err)
+	}
+
+	fmt.Printf("Found %d unused disks.\n", len(disks))
+	for _, d := range disks {
+		fmt.Printf("- %s (size: %v, type: %v)\n", d["name"], d["size"], d["type"])
+	}
 }

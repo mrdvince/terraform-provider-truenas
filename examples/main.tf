@@ -7,12 +7,25 @@ terraform {
 }
 
 provider "truenas" {
-  # api_key is set via TRUENAS_DEV_KEY env var
-  # host is default to https://192.168.50.39
+  # api_key and host from env vars
 }
 
-data "truenas_system_version" "test" {}
+data "truenas_disks" "all" {}
 
-output "truenas_version" {
-  value = data.truenas_system_version.test.version
+output "available_disks" {
+  value = data.truenas_disks.all.ids
+}
+
+resource "truenas_pool" "tank" {
+  name = "tank"
+  topology {
+    data {
+      type  = "STRIPE"
+      disks = [data.truenas_disks.all.ids[0]] # dynamically selects the first available disk
+    }
+  }
+}
+
+output "pool_id" {
+  value = truenas_pool.tank.id
 }
