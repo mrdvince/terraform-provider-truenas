@@ -18,6 +18,7 @@ type Client struct {
 	host      string
 	apiKey    string
 	mu        sync.Mutex
+	writeMu   sync.Mutex
 	pending   map[string]chan *Response
 	nextID    int
 	connected chan struct{}
@@ -166,7 +167,10 @@ func (c *Client) Call(ctx context.Context, method string, params []any) (*Respon
 		Params: params,
 	}
 
-	if err := c.conn.WriteJSON(req); err != nil {
+	c.writeMu.Lock()
+	err := c.conn.WriteJSON(req)
+	c.writeMu.Unlock()
+	if err != nil {
 		return nil, err
 	}
 
