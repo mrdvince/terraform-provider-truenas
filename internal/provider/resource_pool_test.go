@@ -74,15 +74,14 @@ func TestAccPoolResource_forceRecreate(t *testing.T) {
 
 func TestAccPoolResource_mirror(t *testing.T) {
 	testAccPreCheck(t)
-	t.Skip("requires at least 2 disks")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories(),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccPoolResourceConfigMirror("mirrortest"),
+				Config: testAccPoolResourceConfigMirror("mpool"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("truenas_pool.test", "name", "mirrortest"),
+					resource.TestCheckResourceAttr("truenas_pool.test", "name", "mpool"),
 					resource.TestCheckResourceAttr("truenas_pool.test", "topology.data.0.type", "MIRROR"),
 					resource.TestCheckResourceAttr("truenas_pool.test", "topology.data.0.disks.#", "2"),
 				),
