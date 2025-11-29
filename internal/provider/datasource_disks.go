@@ -22,10 +22,10 @@ type disksDataSource struct {
 }
 
 type disksDataSourceModel struct {
-	ID       types.String           `tfsdk:"id"`
-	Ids      []types.String         `tfsdk:"ids"`
-	Disks    []diskModel            `tfsdk:"disks"`
-	BySerial map[string]diskModel   `tfsdk:"by_serial"`
+	ID       types.String         `tfsdk:"id"`
+	Ids      []types.String       `tfsdk:"ids"`
+	Disks    []diskModel          `tfsdk:"disks"`
+	BySerial map[string]diskModel `tfsdk:"by_serial"`
 }
 
 type diskModel struct {
