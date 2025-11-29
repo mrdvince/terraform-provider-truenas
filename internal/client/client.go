@@ -13,6 +13,11 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var (
+	clientCache   = make(map[string]*Client)
+	clientCacheMu sync.Mutex
+)
+
 type Client struct {
 	conn      *websocket.Conn
 	host      string
@@ -22,6 +27,7 @@ type Client struct {
 	pending   map[string]chan *Response
 	nextID    int
 	connected chan struct{}
+	closed    bool
 }
 
 type Request struct {
@@ -48,6 +54,15 @@ type ResponseError struct {
 }
 
 func NewClient(host, apiKey string) (*Client, error) {
+	cacheKey := host + ":" + apiKey
+
+	clientCacheMu.Lock()
+	if cached, ok := clientCache[cacheKey]; ok && !cached.closed {
+		clientCacheMu.Unlock()
+		return cached, nil
+	}
+	clientCacheMu.Unlock()
+
 	// truenas websocket url
 	url := fmt.Sprintf("%s/websocket", host)
 	// handle wss if https is provided
@@ -85,6 +100,10 @@ func NewClient(host, apiKey string) (*Client, error) {
 	if err := c.auth(); err != nil {
 		return nil, err
 	}
+
+	clientCacheMu.Lock()
+	clientCache[cacheKey] = c
+	clientCacheMu.Unlock()
 
 	return c, nil
 }
@@ -182,7 +201,7 @@ func (c *Client) Call(ctx context.Context, method string, params []any) (*Respon
 		return resp, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case <-time.After(10 * time.Second):
+	case <-time.After(30 * time.Second):
 		return nil, fmt.Errorf("timeout waiting for response to %s", method)
 	}
 }
@@ -228,4 +247,31 @@ func (c *Client) newID() string {
 	defer c.mu.Unlock()
 	c.nextID++
 	return fmt.Sprintf("%d", c.nextID)
+}
+
+func (c *Client) Close() error {
+	c.mu.Lock()
+	c.closed = true
+	c.mu.Unlock()
+
+	clientCacheMu.Lock()
+	for key, cached := range clientCache {
+		if cached == c {
+			delete(clientCache, key)
+			break
+		}
+	}
+	clientCacheMu.Unlock()
+
+	return c.conn.Close()
+}
+
+// ResetClientCache clears the client cache, useful for tests
+func ResetClientCache() {
+	clientCacheMu.Lock()
+	defer clientCacheMu.Unlock()
+	for key, c := range clientCache {
+		c.conn.Close()
+		delete(clientCache, key)
+	}
 }
