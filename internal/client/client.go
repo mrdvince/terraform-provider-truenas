@@ -45,12 +45,11 @@ type Response struct {
 }
 
 type ResponseError struct {
-	Error            string `json:"error"`
-	ErrCode          int    `json:"error_code"`
-	ErrorText        string `json:"error_text"`
+	Error            int    `json:"error"`
+	ErrName          string `json:"errname"`
+	Reason           string `json:"reason"`
 	Trace            any    `json:"trace,omitempty"`
-	Logs             any    `json:"logs,omitempty"`
-	ValidationErrors any    `json:"validation_errors,omitempty"`
+	Extra            any    `json:"extra,omitempty"`
 }
 
 func NewClient(host, apiKey string) (*Client, error) {
@@ -196,7 +195,7 @@ func (c *Client) Call(ctx context.Context, method string, params []any) (*Respon
 	select {
 	case resp := <-ch:
 		if resp.Error != nil {
-			return nil, fmt.Errorf("api error: %s (code %d)", resp.Error.Error, resp.Error.ErrCode)
+			return nil, fmt.Errorf("api error [%s]: %s", resp.Error.ErrName, resp.Error.Reason)
 		}
 		return resp, nil
 	case <-ctx.Done():

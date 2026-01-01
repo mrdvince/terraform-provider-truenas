@@ -103,6 +103,8 @@ func (p *truenasProvider) Resources(ctx context.Context) []func() resource.Resou
 	return []func() resource.Resource{
 		NewPoolResource,
 		NewDatasetResource,
+		NewDockerResource,
+		NewAppResource,
 	}
 }
 

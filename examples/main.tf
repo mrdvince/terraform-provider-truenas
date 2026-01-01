@@ -114,3 +114,26 @@ output "media_apps" {
 output "plex_info" {
   value = data.truenas_app_available.media.apps["plex"]
 }
+
+resource "truenas_docker" "config" {
+  pool = truenas_pool.storage.name
+}
+
+resource "truenas_app" "syncthing" {
+  depends_on  = [truenas_docker.config]
+  name        = "syncthing"
+  catalog_app = "syncthing"
+  train       = "stable"
+  values = jsonencode({
+    TZ = "Europe/Amsterdam"
+  })
+}
+
+output "syncthing_app" {
+  value = {
+    name    = truenas_app.syncthing.name
+    state   = truenas_app.syncthing.state
+    version = truenas_app.syncthing.installed_version
+    portals = truenas_app.syncthing.portals
+  }
+}
