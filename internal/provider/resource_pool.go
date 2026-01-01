@@ -66,8 +66,8 @@ type topologyModel struct {
 }
 
 type vdevModel struct {
-	Type  types.String   `tfsdk:"type"`
-	Disks []types.String `tfsdk:"disks"`
+	Type  types.String `tfsdk:"type"`
+	Disks types.List   `tfsdk:"disks"`
 }
 
 func (r *poolResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -189,14 +189,18 @@ func (r *poolResource) Create(ctx context.Context, req resource.CreateRequest, r
 	if data.Topology != nil {
 		var dataVdevs []any
 		for _, vdev := range data.Topology.Data {
-			disks := []string{}
-			for _, d := range vdev.Disks {
-				disks = append(disks, d.ValueString())
+			var diskStrings []string
+			if !vdev.Disks.IsNull() && !vdev.Disks.IsUnknown() {
+				var diskValues []types.String
+				vdev.Disks.ElementsAs(ctx, &diskValues, false)
+				for _, d := range diskValues {
+					diskStrings = append(diskStrings, d.ValueString())
+				}
 			}
 
 			dataVdevs = append(dataVdevs, map[string]any{
 				"type":  strings.ToUpper(vdev.Type.ValueString()),
-				"disks": disks,
+				"disks": diskStrings,
 			})
 		}
 		topology["data"] = dataVdevs
@@ -281,22 +285,23 @@ func (r *poolResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 					}
 				}
 
-				var disks []types.String
+				var diskStrings []string
 				if children, ok := vdevMap["children"].([]any); ok && len(children) > 0 {
 					for _, c := range children {
 						if childMap, ok := c.(map[string]any); ok {
 							if disk, ok := childMap["disk"].(string); ok {
-								disks = append(disks, types.StringValue(disk))
+								diskStrings = append(diskStrings, disk)
 							}
 						}
 					}
 				} else if disk, ok := vdevMap["disk"].(string); ok {
-					disks = append(disks, types.StringValue(disk))
+					diskStrings = append(diskStrings, disk)
 				}
 
+				diskList, _ := types.ListValueFrom(ctx, types.StringType, diskStrings)
 				vdevs = append(vdevs, vdevModel{
 					Type:  types.StringValue(vdevType),
-					Disks: disks,
+					Disks: diskList,
 				})
 			}
 

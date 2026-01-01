@@ -90,6 +90,32 @@ func TestAccPoolResource_mirror(t *testing.T) {
 	})
 }
 
+func TestAccPoolResource_vdevTypeChange(t *testing.T) {
+	testAccPreCheck(t)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccPoolResourceConfigVdevType("typechange", "MIRROR"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("truenas_pool.test", "name", "typechange"),
+					resource.TestCheckResourceAttr("truenas_pool.test", "topology.data.0.type", "MIRROR"),
+				),
+				ExpectNonEmptyPlan: true,
+			},
+			{
+				Config: testAccPoolResourceConfigVdevType("typechange", "STRIPE"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("truenas_pool.test", "name", "typechange"),
+					resource.TestCheckResourceAttr("truenas_pool.test", "topology.data.0.type", "STRIPE"),
+				),
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
 func testAccPoolResourceConfig(name string) string {
 	return fmt.Sprintf(`
 data "truenas_disks" "available" {}
@@ -137,4 +163,21 @@ resource "truenas_pool" "test" {
   }
 }
 `, name)
+}
+
+func testAccPoolResourceConfigVdevType(name, vdevType string) string {
+	return fmt.Sprintf(`
+data "truenas_disks" "available" {}
+
+resource "truenas_pool" "test" {
+  name           = %q
+  force_recreate = true
+  topology {
+    data {
+      type  = %q
+      disks = [data.truenas_disks.available.ids[0], data.truenas_disks.available.ids[1]]
+    }
+  }
+}
+`, name, vdevType)
 }
