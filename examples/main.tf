@@ -91,6 +91,12 @@ output "nested_datasets" {
   }
 }
 
+data "truenas_app_categories" "all" {}
+
+output "app_categories" {
+  value = data.truenas_app_categories.all.categories
+}
+
 data "truenas_app_available" "all" {}
 
 data "truenas_app_available" "media" {
