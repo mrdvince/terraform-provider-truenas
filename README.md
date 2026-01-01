@@ -66,9 +66,10 @@ Manages a ZFS dataset.
 
 ```hcl
 resource "truenas_dataset" "apps" {
-  name    = "apps"
-  parent  = truenas_pool.storage.name
-  pool_id = truenas_pool.storage.pool_id
+  name       = "apps"
+  parent     = truenas_pool.storage.name
+  pool_id    = truenas_pool.storage.pool_id
+  acl_preset = "NFS4_OPEN"
 }
 
 resource "truenas_dataset" "immich" {
@@ -76,6 +77,7 @@ resource "truenas_dataset" "immich" {
   parent      = truenas_dataset.apps.id
   pool_id     = truenas_pool.storage.pool_id
   compression = "LZ4"
+  acl_preset  = "NFS4_OPEN"
 }
 ```
 
@@ -91,6 +93,14 @@ resource "truenas_dataset" "immich" {
 - `snapdir` - (Optional) Snapshot directory visibility: VISIBLE, HIDDEN, DISABLED.
 - `acltype` - (Optional) ACL type: NFSV4, POSIX, OFF, INHERIT.
 - `aclmode` - (Optional) ACL mode: PASSTHROUGH, RESTRICTED, DISCARD, INHERIT.
+- `acl_preset` - (Optional) ACL preset to apply. Sets the appropriate acltype and applies actual ACL entries with inheritance via `filesystem.setacl`. Available presets:
+  - `NFS4_OPEN` - Full control for owner/group, modify for everyone (with inheritance)
+  - `NFS4_RESTRICTED` - Full control for owner, modify for group (with inheritance)
+  - `NFS4_HOME` - Full control for owner, limited access for group/everyone
+  - `NFS4_ADMIN` - Full control for owner, traverse for group (with inheritance)
+  - `POSIX_OPEN` - rwx for owner, group, and other
+  - `POSIX_RESTRICTED` - rwx for owner/group, no access for other
+  - `POSIX_HOME` - rwx for owner/group, rx for other
 - `sync` - (Optional) Sync mode: STANDARD, ALWAYS, DISABLED.
 - `atime` - (Optional) Access time updates: ON, OFF.
 - `readonly` - (Optional) Read-only mode: ON, OFF.
