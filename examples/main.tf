@@ -53,8 +53,7 @@ resource "truenas_dataset" "apps" {
   parent      = truenas_pool.storage.name
   pool_id     = truenas_pool.storage.pool_id
   compression = "LZ4"
-  acltype     = "NFSV4"
-  aclmode     = "PASSTHROUGH"
+  acl_preset  = "NFS4_OPEN"
   atime       = "OFF"
 }
 
@@ -63,23 +62,24 @@ resource "truenas_dataset" "immich" {
   parent      = truenas_dataset.apps.id
   pool_id     = truenas_pool.storage.pool_id
   compression = "ZSTD"
-  acltype     = "NFSV4"
-  aclmode     = "PASSTHROUGH"
+  acl_preset  = "NFS4_OPEN"
   atime       = "OFF"
 }
 
 resource "truenas_dataset" "uploads" {
-  name     = "uploads"
-  parent   = truenas_dataset.immich.id
-  pool_id  = truenas_pool.storage.pool_id
-  quota    = 10737418240
-  snapdir  = "VISIBLE"
+  name       = "uploads"
+  parent     = truenas_dataset.immich.id
+  pool_id    = truenas_pool.storage.pool_id
+  quota      = 10737418240
+  snapdir    = "VISIBLE"
+  acl_preset = "NFS4_OPEN"
 }
 
 resource "truenas_dataset" "data" {
-  name    = "thumbs"
-  parent  = truenas_dataset.immich.id
-  pool_id = truenas_pool.storage.pool_id
+  name       = "thumbs"
+  parent     = truenas_dataset.immich.id
+  pool_id    = truenas_pool.storage.pool_id
+  acl_preset = "NFS4_OPEN"
 }
 
 output "nested_datasets" {

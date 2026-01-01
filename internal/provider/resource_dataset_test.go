@@ -206,3 +206,64 @@ resource "truenas_dataset" "test" {
 }
 `, poolName, datasetName, acltype, aclmode)
 }
+
+func TestAccDatasetResource_aclPreset(t *testing.T) {
+	testAccPreCheck(t)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccDatasetResourceConfigWithAclPreset("dspresettest", "presetds", "NFS4_OPEN"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("truenas_dataset.test", "name", "presetds"),
+					resource.TestCheckResourceAttr("truenas_dataset.test", "acltype", "NFSV4"),
+				),
+			},
+			{
+				Config: testAccDatasetResourceConfigWithAclPreset("dspresettest", "presetds", "NFS4_RESTRICTED"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("truenas_dataset.test", "acltype", "NFSV4"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccDatasetResource_aclPresetPosix(t *testing.T) {
+	testAccPreCheck(t)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccDatasetResourceConfigWithAclPreset("dsposixtest", "posixds", "POSIX_OPEN"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("truenas_dataset.test", "name", "posixds"),
+					resource.TestCheckResourceAttr("truenas_dataset.test", "acltype", "POSIX"),
+				),
+			},
+		},
+	})
+}
+
+func testAccDatasetResourceConfigWithAclPreset(poolName, datasetName, aclPreset string) string {
+	return fmt.Sprintf(`
+resource "truenas_pool" "test" {
+  name           = %q
+  force_recreate = true
+  topology {
+    data {
+      type = "STRIPE"
+    }
+  }
+}
+
+resource "truenas_dataset" "test" {
+  name       = %q
+  parent     = truenas_pool.test.name
+  pool_id    = truenas_pool.test.pool_id
+  acl_preset = %q
+}
+`, poolName, datasetName, aclPreset)
+}

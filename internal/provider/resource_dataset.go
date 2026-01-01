@@ -20,6 +20,75 @@ import (
 var _ resource.Resource = &datasetResource{}
 var _ resource.ResourceWithImportState = &datasetResource{}
 
+var aclPresets = map[string]struct {
+	acltype string
+	dacl    []map[string]any
+}{
+	"NFS4_OPEN": {
+		acltype: "NFS4",
+		dacl: []map[string]any{
+			{"tag": "owner@", "type": "ALLOW", "perms": map[string]any{"BASIC": "FULL_CONTROL"}, "flags": map[string]any{"BASIC": "INHERIT"}},
+			{"tag": "group@", "type": "ALLOW", "perms": map[string]any{"BASIC": "FULL_CONTROL"}, "flags": map[string]any{"BASIC": "INHERIT"}},
+			{"tag": "everyone@", "type": "ALLOW", "perms": map[string]any{"BASIC": "MODIFY"}, "flags": map[string]any{"BASIC": "INHERIT"}},
+		},
+	},
+	"NFS4_RESTRICTED": {
+		acltype: "NFS4",
+		dacl: []map[string]any{
+			{"tag": "owner@", "type": "ALLOW", "perms": map[string]any{"BASIC": "FULL_CONTROL"}, "flags": map[string]any{"BASIC": "INHERIT"}},
+			{"tag": "group@", "type": "ALLOW", "perms": map[string]any{"BASIC": "MODIFY"}, "flags": map[string]any{"BASIC": "INHERIT"}},
+		},
+	},
+	"NFS4_HOME": {
+		acltype: "NFS4",
+		dacl: []map[string]any{
+			{"tag": "owner@", "type": "ALLOW", "perms": map[string]any{"BASIC": "FULL_CONTROL"}, "flags": map[string]any{"BASIC": "INHERIT"}},
+			{"tag": "group@", "type": "ALLOW", "perms": map[string]any{"BASIC": "MODIFY"}, "flags": map[string]any{"BASIC": "NOINHERIT"}},
+			{"tag": "everyone@", "type": "ALLOW", "perms": map[string]any{"BASIC": "TRAVERSE"}, "flags": map[string]any{"BASIC": "NOINHERIT"}},
+		},
+	},
+	"NFS4_ADMIN": {
+		acltype: "NFS4",
+		dacl: []map[string]any{
+			{"tag": "owner@", "type": "ALLOW", "perms": map[string]any{"BASIC": "FULL_CONTROL"}, "flags": map[string]any{"BASIC": "INHERIT"}},
+			{"tag": "group@", "type": "ALLOW", "perms": map[string]any{"BASIC": "TRAVERSE"}, "flags": map[string]any{"BASIC": "INHERIT"}},
+		},
+	},
+	"POSIX_OPEN": {
+		acltype: "POSIX1E",
+		dacl: []map[string]any{
+			{"tag": "USER_OBJ", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": true, "id": -1},
+			{"tag": "GROUP_OBJ", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": true, "id": -1},
+			{"tag": "OTHER", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": true, "id": -1},
+			{"tag": "USER_OBJ", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": false, "id": -1},
+			{"tag": "GROUP_OBJ", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": false, "id": -1},
+			{"tag": "OTHER", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": false, "id": -1},
+		},
+	},
+	"POSIX_RESTRICTED": {
+		acltype: "POSIX1E",
+		dacl: []map[string]any{
+			{"tag": "USER_OBJ", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": true, "id": -1},
+			{"tag": "GROUP_OBJ", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": true, "id": -1},
+			{"tag": "OTHER", "perms": map[string]any{"READ": false, "WRITE": false, "EXECUTE": false}, "default": true, "id": -1},
+			{"tag": "USER_OBJ", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": false, "id": -1},
+			{"tag": "GROUP_OBJ", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": false, "id": -1},
+			{"tag": "OTHER", "perms": map[string]any{"READ": false, "WRITE": false, "EXECUTE": false}, "default": false, "id": -1},
+		},
+	},
+	"POSIX_HOME": {
+		acltype: "POSIX1E",
+		dacl: []map[string]any{
+			{"tag": "USER_OBJ", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": true, "id": -1},
+			{"tag": "GROUP_OBJ", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": true, "id": -1},
+			{"tag": "OTHER", "perms": map[string]any{"READ": false, "WRITE": false, "EXECUTE": false}, "default": true, "id": -1},
+			{"tag": "USER_OBJ", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": false, "id": -1},
+			{"tag": "GROUP_OBJ", "perms": map[string]any{"READ": true, "WRITE": true, "EXECUTE": true}, "default": false, "id": -1},
+			{"tag": "OTHER", "perms": map[string]any{"READ": true, "WRITE": false, "EXECUTE": true}, "default": false, "id": -1},
+		},
+	},
+}
+
 func NewDatasetResource() resource.Resource {
 	return &datasetResource{}
 }
@@ -42,6 +111,7 @@ type datasetResourceModel struct {
 	Snapdir     types.String `tfsdk:"snapdir"`
 	Acltype     types.String `tfsdk:"acltype"`
 	Aclmode     types.String `tfsdk:"aclmode"`
+	AclPreset   types.String `tfsdk:"acl_preset"`
 	Sync        types.String `tfsdk:"sync"`
 	Atime       types.String `tfsdk:"atime"`
 	Readonly    types.String `tfsdk:"readonly"`
@@ -130,6 +200,10 @@ func (r *datasetResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Computed:            true,
 				MarkdownDescription: "ACL mode (PASSTHROUGH, RESTRICTED, DISCARD, INHERIT).",
 			},
+			"acl_preset": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "ACL preset to apply (NFS4_OPEN, NFS4_RESTRICTED, NFS4_HOME, NFS4_ADMIN, POSIX_OPEN, POSIX_RESTRICTED, POSIX_HOME, POSIX_ADMIN). Sets both acltype and applies the ACL entries with inheritance.",
+			},
 			"sync": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -171,6 +245,35 @@ func (r *datasetResource) Configure(ctx context.Context, req resource.ConfigureR
 	r.client = client
 }
 
+func (r *datasetResource) applyACLPreset(ctx context.Context, mountpoint string, presetName string) error {
+	preset, ok := aclPresets[strings.ToUpper(presetName)]
+	if !ok {
+		return fmt.Errorf("unknown ACL preset: %s", presetName)
+	}
+
+	params := []any{
+		map[string]any{
+			"path":    mountpoint,
+			"dacl":    preset.dacl,
+			"acltype": preset.acltype,
+		},
+	}
+
+	apiResp, err := r.client.Call(ctx, "filesystem.setacl", params)
+	if err != nil {
+		return fmt.Errorf("failed to apply ACL preset: %w", err)
+	}
+
+	var jobID int64
+	if err := json.Unmarshal(apiResp.Result, &jobID); err == nil {
+		if err := r.client.WaitForJob(ctx, jobID); err != nil {
+			return fmt.Errorf("ACL preset job failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func (r *datasetResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data datasetResourceModel
 
@@ -205,7 +308,16 @@ func (r *datasetResource) Create(ctx context.Context, req resource.CreateRequest
 		createParams["snapdir"] = strings.ToUpper(data.Snapdir.ValueString())
 	}
 
-	if !data.Acltype.IsNull() && !data.Acltype.IsUnknown() {
+	if !data.AclPreset.IsNull() && !data.AclPreset.IsUnknown() {
+		preset, ok := aclPresets[strings.ToUpper(data.AclPreset.ValueString())]
+		if ok {
+			if preset.acltype == "NFS4" {
+				createParams["acltype"] = "NFSV4"
+			} else {
+				createParams["acltype"] = "POSIX"
+			}
+		}
+	} else if !data.Acltype.IsNull() && !data.Acltype.IsUnknown() {
 		createParams["acltype"] = strings.ToUpper(data.Acltype.ValueString())
 	}
 
@@ -244,6 +356,13 @@ func (r *datasetResource) Create(ctx context.Context, req resource.CreateRequest
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() || !found {
 		return
+	}
+
+	if !data.AclPreset.IsNull() && !data.AclPreset.IsUnknown() && !data.Mountpoint.IsNull() {
+		if err := r.applyACLPreset(ctx, data.Mountpoint.ValueString(), data.AclPreset.ValueString()); err != nil {
+			resp.Diagnostics.AddError("Client error", fmt.Sprintf("Unable to apply ACL preset: %s", err))
+			return
+		}
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -455,7 +574,18 @@ func (r *datasetResource) Update(ctx context.Context, req resource.UpdateRequest
 		updateParams["snapdir"] = strings.ToUpper(data.Snapdir.ValueString())
 	}
 
-	if !data.Acltype.IsNull() && !data.Acltype.IsUnknown() {
+	aclPresetChanged := false
+	if !data.AclPreset.IsNull() && !data.AclPreset.IsUnknown() {
+		preset, ok := aclPresets[strings.ToUpper(data.AclPreset.ValueString())]
+		if ok {
+			if preset.acltype == "NFS4" {
+				updateParams["acltype"] = "NFSV4"
+			} else {
+				updateParams["acltype"] = "POSIX"
+			}
+			aclPresetChanged = state.AclPreset.IsNull() || state.AclPreset.ValueString() != data.AclPreset.ValueString()
+		}
+	} else if !data.Acltype.IsNull() && !data.Acltype.IsUnknown() {
 		updateParams["acltype"] = strings.ToUpper(data.Acltype.ValueString())
 	}
 
@@ -502,6 +632,13 @@ func (r *datasetResource) Update(ctx context.Context, req resource.UpdateRequest
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() || !found {
 		return
+	}
+
+	if aclPresetChanged && !data.Mountpoint.IsNull() {
+		if err := r.applyACLPreset(ctx, data.Mountpoint.ValueString(), data.AclPreset.ValueString()); err != nil {
+			resp.Diagnostics.AddError("Client error", fmt.Sprintf("Unable to apply ACL preset: %s", err))
+			return
+		}
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
