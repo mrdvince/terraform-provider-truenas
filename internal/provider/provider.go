@@ -111,6 +111,7 @@ func (p *truenasProvider) DataSources(ctx context.Context) []func() datasource.D
 		NewSystemVersionDataSource,
 		NewDisksDataSource,
 		NewDatasetDataSource,
+		NewAppAvailableDataSource,
 	}
 }
 

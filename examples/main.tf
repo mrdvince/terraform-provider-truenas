@@ -90,3 +90,21 @@ output "nested_datasets" {
     data    = truenas_dataset.data.id
   }
 }
+
+data "truenas_app_available" "all" {}
+
+data "truenas_app_available" "media" {
+  category = "media"
+}
+
+output "available_app_count" {
+  value = length(data.truenas_app_available.all.apps)
+}
+
+output "media_apps" {
+  value = keys(data.truenas_app_available.media.apps)
+}
+
+output "plex_info" {
+  value = data.truenas_app_available.media.apps["plex"]
+}
