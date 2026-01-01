@@ -34,3 +34,17 @@ resource "truenas_pool" "storage" {
 output "pool_id" {
   value = truenas_pool.storage.id
 }
+
+data "truenas_dataset" "root" {
+  id = truenas_pool.storage.name
+}
+
+output "dataset_info" {
+  value = {
+    id          = data.truenas_dataset.root.id
+    name        = data.truenas_dataset.root.name
+    pool        = data.truenas_dataset.root.pool
+    mountpoint  = data.truenas_dataset.root.mountpoint
+    compression = data.truenas_dataset.root.compression
+  }
+}

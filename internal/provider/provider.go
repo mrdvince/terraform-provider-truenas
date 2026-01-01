@@ -109,6 +109,7 @@ func (p *truenasProvider) DataSources(ctx context.Context) []func() datasource.D
 	return []func() datasource.DataSource{
 		NewSystemVersionDataSource,
 		NewDisksDataSource,
+		NewDatasetDataSource,
 	}
 }
 
