@@ -130,7 +130,8 @@ func (d *datasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	data.ID = types.StringValue(dataset["id"].(string))
 
 	if name, ok := dataset["name"].(string); ok {
-		data.Name = types.StringValue(name)
+		parts := strings.Split(name, "/")
+		data.Name = types.StringValue(parts[len(parts)-1])
 	}
 
 	if pool, ok := dataset["pool"].(string); ok {

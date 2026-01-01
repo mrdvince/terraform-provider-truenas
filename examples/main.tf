@@ -48,3 +48,26 @@ output "dataset_info" {
     compression = data.truenas_dataset.root.compression
   }
 }
+
+resource "truenas_dataset" "apps" {
+  name   = "apps"
+  parent = truenas_pool.storage.name
+}
+
+resource "truenas_dataset" "immich" {
+  name   = "immich"
+  parent = truenas_dataset.apps.id
+}
+
+resource "truenas_dataset" "uploads" {
+  name   = "uploads"
+  parent = truenas_dataset.immich.id
+}
+
+output "nested_datasets" {
+  value = {
+    apps    = truenas_dataset.apps.id
+    immich  = truenas_dataset.immich.id
+    uploads = truenas_dataset.uploads.id
+  }
+}

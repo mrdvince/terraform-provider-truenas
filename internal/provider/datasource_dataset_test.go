@@ -27,7 +27,21 @@ func TestAccDatasetDataSource_basic(t *testing.T) {
 }
 
 func TestAccDatasetDataSource_nested(t *testing.T) {
-	t.Skip("requires dataset resource - enabled in Phase 2")
+	testAccPreCheck(t)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccDatasetDataSourceConfigNested("dsnestedtest"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.truenas_dataset.child", "id", "dsnestedtest/apps"),
+					resource.TestCheckResourceAttr("data.truenas_dataset.child", "name", "apps"),
+					resource.TestCheckResourceAttr("data.truenas_dataset.child", "pool", "dsnestedtest"),
+				),
+			},
+		},
+	})
 }
 
 func testAccDatasetDataSourceConfig(poolName string) string {
