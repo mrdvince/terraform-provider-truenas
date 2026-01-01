@@ -126,8 +126,8 @@ func (d *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 
-	var ids []types.String
-	var diskModels []diskModel
+	ids := []types.String{}
+	diskModels := []diskModel{}
 	bySerial := make(map[string]diskModel)
 
 	for _, disk := range disks {
