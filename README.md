@@ -86,12 +86,30 @@ resource "truenas_dataset" "immich" {
 - `pool_id` - (Optional) The pool's internal ID. Set this to `truenas_pool.*.pool_id` to automatically recreate datasets when the pool is replaced.
 - `comments` - (Optional) User comments.
 - `compression` - (Optional) Compression algorithm: OFF, LZ4, GZIP, ZLE, LZJB, ZSTD.
+- `quota` - (Optional) Maximum space for dataset and descendants in bytes (0 = no quota).
+- `refquota` - (Optional) Maximum space for dataset only in bytes (0 = no refquota).
+- `snapdir` - (Optional) Snapshot directory visibility: VISIBLE, HIDDEN, DISABLED.
+- `acltype` - (Optional) ACL type: NFSV4, POSIX, OFF, INHERIT.
+- `aclmode` - (Optional) ACL mode: PASSTHROUGH, RESTRICTED, DISCARD, INHERIT.
+- `sync` - (Optional) Sync mode: STANDARD, ALWAYS, DISABLED.
+- `atime` - (Optional) Access time updates: ON, OFF.
+- `readonly` - (Optional) Read-only mode: ON, OFF.
+- `exec` - (Optional) Allow execution of binaries: ON, OFF.
 
 #### Attributes
 
 - `id` - The full dataset path (e.g., `pool/parent/name`).
 - `pool` - The pool containing this dataset.
 - `mountpoint` - The filesystem mountpoint.
+- `quota` - The quota in bytes.
+- `refquota` - The refquota in bytes.
+- `snapdir` - Snapshot directory visibility.
+- `acltype` - ACL type.
+- `aclmode` - ACL mode.
+- `sync` - Sync mode.
+- `atime` - Access time setting.
+- `readonly` - Read-only mode.
+- `exec` - Execution permission.
 
 ## Data Sources
 

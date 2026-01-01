@@ -50,21 +50,26 @@ output "dataset_info" {
 }
 
 resource "truenas_dataset" "apps" {
-  name    = "apps"
-  parent  = truenas_pool.storage.name
-  pool_id = truenas_pool.storage.pool_id
+  name        = "apps"
+  parent      = truenas_pool.storage.name
+  pool_id     = truenas_pool.storage.pool_id
+  compression = "LZ4"
 }
 
 resource "truenas_dataset" "immich" {
-  name    = "immich"
-  parent  = truenas_dataset.apps.id
-  pool_id = truenas_pool.storage.pool_id
+  name        = "immich"
+  parent      = truenas_dataset.apps.id
+  pool_id     = truenas_pool.storage.pool_id
+  compression = "ZSTD"
+  atime       = "OFF"
 }
 
 resource "truenas_dataset" "uploads" {
-  name    = "uploads"
-  parent  = truenas_dataset.immich.id
-  pool_id = truenas_pool.storage.pool_id
+  name     = "uploads"
+  parent   = truenas_dataset.immich.id
+  pool_id  = truenas_pool.storage.pool_id
+  quota    = 10737418240
+  snapdir  = "VISIBLE"
 }
 
 resource "truenas_dataset" "data" {

@@ -37,6 +37,15 @@ type datasetResourceModel struct {
 	Mountpoint  types.String `tfsdk:"mountpoint"`
 	Comments    types.String `tfsdk:"comments"`
 	Compression types.String `tfsdk:"compression"`
+	Quota       types.Int64  `tfsdk:"quota"`
+	Refquota    types.Int64  `tfsdk:"refquota"`
+	Snapdir     types.String `tfsdk:"snapdir"`
+	Acltype     types.String `tfsdk:"acltype"`
+	Aclmode     types.String `tfsdk:"aclmode"`
+	Sync        types.String `tfsdk:"sync"`
+	Atime       types.String `tfsdk:"atime"`
+	Readonly    types.String `tfsdk:"readonly"`
+	Exec        types.String `tfsdk:"exec"`
 }
 
 func (r *datasetResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -96,6 +105,51 @@ func (r *datasetResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Computed:            true,
 				MarkdownDescription: "Compression algorithm (OFF, LZ4, GZIP, ZLE, LZJB, ZSTD).",
 			},
+			"quota": schema.Int64Attribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "Maximum space for dataset and descendants in bytes (0 = no quota).",
+			},
+			"refquota": schema.Int64Attribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "Maximum space for dataset only, excluding snapshots and descendants, in bytes (0 = no refquota).",
+			},
+			"snapdir": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "Snapshot directory visibility (VISIBLE, HIDDEN, DISABLED).",
+			},
+			"acltype": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "ACL type (NFSV4, POSIX, OFF, INHERIT).",
+			},
+			"aclmode": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "ACL mode (PASSTHROUGH, RESTRICTED, DISCARD, INHERIT).",
+			},
+			"sync": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "Sync mode (STANDARD, ALWAYS, DISABLED).",
+			},
+			"atime": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "Access time updates (ON, OFF).",
+			},
+			"readonly": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "Read-only mode (ON, OFF).",
+			},
+			"exec": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "Allow execution of binaries (ON, OFF).",
+			},
 		},
 	}
 }
@@ -137,6 +191,42 @@ func (r *datasetResource) Create(ctx context.Context, req resource.CreateRequest
 
 	if !data.Compression.IsNull() && !data.Compression.IsUnknown() {
 		createParams["compression"] = strings.ToUpper(data.Compression.ValueString())
+	}
+
+	if !data.Quota.IsNull() && !data.Quota.IsUnknown() {
+		createParams["quota"] = data.Quota.ValueInt64()
+	}
+
+	if !data.Refquota.IsNull() && !data.Refquota.IsUnknown() {
+		createParams["refquota"] = data.Refquota.ValueInt64()
+	}
+
+	if !data.Snapdir.IsNull() && !data.Snapdir.IsUnknown() {
+		createParams["snapdir"] = strings.ToUpper(data.Snapdir.ValueString())
+	}
+
+	if !data.Acltype.IsNull() && !data.Acltype.IsUnknown() {
+		createParams["acltype"] = strings.ToUpper(data.Acltype.ValueString())
+	}
+
+	if !data.Aclmode.IsNull() && !data.Aclmode.IsUnknown() {
+		createParams["aclmode"] = strings.ToUpper(data.Aclmode.ValueString())
+	}
+
+	if !data.Sync.IsNull() && !data.Sync.IsUnknown() {
+		createParams["sync"] = strings.ToUpper(data.Sync.ValueString())
+	}
+
+	if !data.Atime.IsNull() && !data.Atime.IsUnknown() {
+		createParams["atime"] = strings.ToUpper(data.Atime.ValueString())
+	}
+
+	if !data.Readonly.IsNull() && !data.Readonly.IsUnknown() {
+		createParams["readonly"] = strings.ToUpper(data.Readonly.ValueString())
+	}
+
+	if !data.Exec.IsNull() && !data.Exec.IsUnknown() {
+		createParams["exec"] = strings.ToUpper(data.Exec.ValueString())
 	}
 
 	_, err := r.client.Call(ctx, "pool.dataset.create", []any{createParams})
@@ -240,6 +330,96 @@ func (r *datasetResource) readDataset(ctx context.Context, data *datasetResource
 		data.Compression = types.StringValue("")
 	}
 
+	if quota, ok := dataset["quota"].(map[string]any); ok {
+		if parsed, ok := quota["parsed"].(float64); ok {
+			data.Quota = types.Int64Value(int64(parsed))
+		} else {
+			data.Quota = types.Int64Value(0)
+		}
+	} else {
+		data.Quota = types.Int64Value(0)
+	}
+
+	if refquota, ok := dataset["refquota"].(map[string]any); ok {
+		if parsed, ok := refquota["parsed"].(float64); ok {
+			data.Refquota = types.Int64Value(int64(parsed))
+		} else {
+			data.Refquota = types.Int64Value(0)
+		}
+	} else {
+		data.Refquota = types.Int64Value(0)
+	}
+
+	if snapdir, ok := dataset["snapdir"].(map[string]any); ok {
+		if value, ok := snapdir["value"].(string); ok {
+			data.Snapdir = types.StringValue(value)
+		} else {
+			data.Snapdir = types.StringValue("")
+		}
+	} else {
+		data.Snapdir = types.StringValue("")
+	}
+
+	if acltype, ok := dataset["acltype"].(map[string]any); ok {
+		if value, ok := acltype["value"].(string); ok {
+			data.Acltype = types.StringValue(value)
+		} else {
+			data.Acltype = types.StringValue("")
+		}
+	} else {
+		data.Acltype = types.StringValue("")
+	}
+
+	if aclmode, ok := dataset["aclmode"].(map[string]any); ok {
+		if value, ok := aclmode["value"].(string); ok {
+			data.Aclmode = types.StringValue(value)
+		} else {
+			data.Aclmode = types.StringValue("")
+		}
+	} else {
+		data.Aclmode = types.StringValue("")
+	}
+
+	if sync, ok := dataset["sync"].(map[string]any); ok {
+		if value, ok := sync["value"].(string); ok {
+			data.Sync = types.StringValue(value)
+		} else {
+			data.Sync = types.StringValue("")
+		}
+	} else {
+		data.Sync = types.StringValue("")
+	}
+
+	if atime, ok := dataset["atime"].(map[string]any); ok {
+		if value, ok := atime["value"].(string); ok {
+			data.Atime = types.StringValue(value)
+		} else {
+			data.Atime = types.StringValue("")
+		}
+	} else {
+		data.Atime = types.StringValue("")
+	}
+
+	if readonly, ok := dataset["readonly"].(map[string]any); ok {
+		if value, ok := readonly["value"].(string); ok {
+			data.Readonly = types.StringValue(value)
+		} else {
+			data.Readonly = types.StringValue("")
+		}
+	} else {
+		data.Readonly = types.StringValue("")
+	}
+
+	if exec, ok := dataset["exec"].(map[string]any); ok {
+		if value, ok := exec["value"].(string); ok {
+			data.Exec = types.StringValue(value)
+		} else {
+			data.Exec = types.StringValue("")
+		}
+	} else {
+		data.Exec = types.StringValue("")
+	}
+
 	return diags, true
 }
 
@@ -261,6 +441,42 @@ func (r *datasetResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	if !data.Compression.IsNull() && !data.Compression.IsUnknown() {
 		updateParams["compression"] = strings.ToUpper(data.Compression.ValueString())
+	}
+
+	if !data.Quota.IsNull() && !data.Quota.IsUnknown() {
+		updateParams["quota"] = data.Quota.ValueInt64()
+	}
+
+	if !data.Refquota.IsNull() && !data.Refquota.IsUnknown() {
+		updateParams["refquota"] = data.Refquota.ValueInt64()
+	}
+
+	if !data.Snapdir.IsNull() && !data.Snapdir.IsUnknown() {
+		updateParams["snapdir"] = strings.ToUpper(data.Snapdir.ValueString())
+	}
+
+	if !data.Acltype.IsNull() && !data.Acltype.IsUnknown() {
+		updateParams["acltype"] = strings.ToUpper(data.Acltype.ValueString())
+	}
+
+	if !data.Aclmode.IsNull() && !data.Aclmode.IsUnknown() {
+		updateParams["aclmode"] = strings.ToUpper(data.Aclmode.ValueString())
+	}
+
+	if !data.Sync.IsNull() && !data.Sync.IsUnknown() {
+		updateParams["sync"] = strings.ToUpper(data.Sync.ValueString())
+	}
+
+	if !data.Atime.IsNull() && !data.Atime.IsUnknown() {
+		updateParams["atime"] = strings.ToUpper(data.Atime.ValueString())
+	}
+
+	if !data.Readonly.IsNull() && !data.Readonly.IsUnknown() {
+		updateParams["readonly"] = strings.ToUpper(data.Readonly.ValueString())
+	}
+
+	if !data.Exec.IsNull() && !data.Exec.IsUnknown() {
+		updateParams["exec"] = strings.ToUpper(data.Exec.ValueString())
 	}
 
 	if len(updateParams) > 0 {
