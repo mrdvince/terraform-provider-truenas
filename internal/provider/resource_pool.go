@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -56,6 +57,7 @@ type poolResource struct {
 
 type poolResourceModel struct {
 	ID            types.String   `tfsdk:"id"`
+	PoolID        types.Int64    `tfsdk:"pool_id"`
 	Name          types.String   `tfsdk:"name"`
 	ForceRecreate types.Bool     `tfsdk:"force_recreate"`
 	Topology      *topologyModel `tfsdk:"topology"`
@@ -82,6 +84,13 @@ func (r *poolResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"pool_id": schema.Int64Attribute{
+				Computed:            true,
+				MarkdownDescription: "the internal numeric id of the pool. use this to trigger dataset replacement when pool is recreated.",
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
@@ -263,6 +272,20 @@ func (r *poolResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	data.ID = data.Name
 
+	// query the pool to get the numeric ID
+	filters := []any{
+		[]any{"name", "=", data.Name.ValueString()},
+	}
+	queryResp, err := r.client.Call(ctx, "pool.query", []any{filters})
+	if err == nil {
+		var pools []map[string]any
+		if json.Unmarshal(queryResp.Result, &pools) == nil && len(pools) > 0 {
+			if id, ok := pools[0]["id"].(float64); ok {
+				data.PoolID = types.Int64Value(int64(id))
+			}
+		}
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -300,6 +323,9 @@ func (r *poolResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	pool := pools[0]
 	data.ID = types.StringValue(pool["name"].(string))
 	data.Name = types.StringValue(pool["name"].(string))
+	if id, ok := pool["id"].(float64); ok {
+		data.PoolID = types.Int64Value(int64(id))
+	}
 
 	if topology, ok := pool["topology"].(map[string]any); ok {
 		if dataVdevs, ok := topology["data"].([]any); ok {

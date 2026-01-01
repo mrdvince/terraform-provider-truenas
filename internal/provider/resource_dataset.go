@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -31,6 +32,7 @@ type datasetResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Name        types.String `tfsdk:"name"`
 	Parent      types.String `tfsdk:"parent"`
+	PoolID      types.Int64  `tfsdk:"pool_id"`
 	Pool        types.String `tfsdk:"pool"`
 	Mountpoint  types.String `tfsdk:"mountpoint"`
 	Comments    types.String `tfsdk:"comments"`
@@ -64,6 +66,13 @@ func (r *datasetResource) Schema(ctx context.Context, req resource.SchemaRequest
 				MarkdownDescription: "The parent dataset path (pool name or parent dataset id).",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"pool_id": schema.Int64Attribute{
+				Optional:            true,
+				MarkdownDescription: "The pool's internal id. set this to truenas_pool.*.pool_id to automatically recreate datasets when the pool is replaced.",
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"pool": schema.StringAttribute{
