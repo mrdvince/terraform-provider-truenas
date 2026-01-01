@@ -143,6 +143,26 @@ func (r *poolResource) Configure(ctx context.Context, req resource.ConfigureRequ
 	r.client = client
 }
 
+func (r *poolResource) getUnusedDisks(ctx context.Context) ([]string, error) {
+	apiResp, err := r.client.Call(ctx, "disk.get_unused", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query unused disks: %w", err)
+	}
+
+	var disks []map[string]any
+	if err := json.Unmarshal(apiResp.Result, &disks); err != nil {
+		return nil, fmt.Errorf("failed to parse unused disks response: %w", err)
+	}
+
+	var names []string
+	for _, disk := range disks {
+		if name, ok := disk["name"].(string); ok {
+			names = append(names, name)
+		}
+	}
+	return names, nil
+}
+
 func (r *poolResource) waitForSystemDataset(ctx context.Context) error {
 	for {
 		filters := []any{
@@ -188,7 +208,7 @@ func (r *poolResource) Create(ctx context.Context, req resource.CreateRequest, r
 	topology := map[string]any{}
 	if data.Topology != nil {
 		var dataVdevs []any
-		for _, vdev := range data.Topology.Data {
+		for i, vdev := range data.Topology.Data {
 			var diskStrings []string
 			if !vdev.Disks.IsNull() && !vdev.Disks.IsUnknown() {
 				var diskValues []types.String
@@ -196,6 +216,19 @@ func (r *poolResource) Create(ctx context.Context, req resource.CreateRequest, r
 				for _, d := range diskValues {
 					diskStrings = append(diskStrings, d.ValueString())
 				}
+			} else if vdev.Disks.IsUnknown() {
+				unusedDisks, err := r.getUnusedDisks(ctx)
+				if err != nil {
+					resp.Diagnostics.AddError("Client error", fmt.Sprintf("Unable to query available disks: %s", err))
+					return
+				}
+				if len(unusedDisks) == 0 {
+					resp.Diagnostics.AddError("Client error", "No unused disks available for pool creation")
+					return
+				}
+				diskStrings = unusedDisks
+				diskList, _ := types.ListValueFrom(ctx, types.StringType, diskStrings)
+				data.Topology.Data[i].Disks = diskList
 			}
 
 			dataVdevs = append(dataVdevs, map[string]any{
