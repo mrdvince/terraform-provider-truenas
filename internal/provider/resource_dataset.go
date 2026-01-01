@@ -480,10 +480,18 @@ func (r *datasetResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	if len(updateParams) > 0 {
-		_, err := r.client.Call(ctx, "pool.dataset.update", []any{state.ID.ValueString(), updateParams})
+		apiResp, err := r.client.Call(ctx, "pool.dataset.update", []any{state.ID.ValueString(), updateParams})
 		if err != nil {
 			resp.Diagnostics.AddError("Client error", fmt.Sprintf("Unable to update dataset: %s", err))
 			return
+		}
+
+		var jobID int64
+		if err := json.Unmarshal(apiResp.Result, &jobID); err == nil {
+			if err := r.client.WaitForJob(ctx, jobID); err != nil {
+				resp.Diagnostics.AddError("Client error", fmt.Sprintf("Dataset update job failed: %s", err))
+				return
+			}
 		}
 	}
 

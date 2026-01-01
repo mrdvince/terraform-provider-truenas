@@ -32,13 +32,19 @@ func (m useStateIfExistsModifier) MarkdownDescription(ctx context.Context) strin
 
 func (m useStateIfExistsModifier) PlanModifyList(ctx context.Context, req planmodifier.ListRequest, resp *planmodifier.ListResponse) {
 	if req.StateValue.IsNull() {
+		if len(req.ConfigValue.Elements()) == 0 && !req.ConfigValue.IsNull() {
+			resp.PlanValue = types.ListUnknown(types.StringType)
+		}
 		return
 	}
 
 	var forceRecreate types.Bool
 	req.Config.GetAttribute(ctx, path.Root("force_recreate"), &forceRecreate)
 	if !forceRecreate.IsNull() && forceRecreate.ValueBool() {
-		if !req.ConfigValue.Equal(req.StateValue) {
+		if len(req.ConfigValue.Elements()) == 0 && !req.ConfigValue.IsNull() {
+			resp.PlanValue = req.StateValue
+		}
+		if !req.PlanValue.Equal(req.StateValue) {
 			resp.RequiresReplace = true
 		}
 		return
@@ -225,7 +231,9 @@ func (r *poolResource) Create(ctx context.Context, req resource.CreateRequest, r
 				for _, d := range diskValues {
 					diskStrings = append(diskStrings, d.ValueString())
 				}
-			} else if vdev.Disks.IsUnknown() {
+			}
+
+			if len(diskStrings) == 0 {
 				unusedDisks, err := r.getUnusedDisks(ctx)
 				if err != nil {
 					resp.Diagnostics.AddError("Client error", fmt.Sprintf("Unable to query available disks: %s", err))

@@ -26,7 +26,6 @@ resource "truenas_pool" "storage" {
   topology {
     data {
       type  = "RAIDZ1"
-      disks = data.truenas_disks.all.ids
     }
   }
 }
@@ -54,6 +53,9 @@ resource "truenas_dataset" "apps" {
   parent      = truenas_pool.storage.name
   pool_id     = truenas_pool.storage.pool_id
   compression = "LZ4"
+  acltype     = "NFSV4"
+  aclmode     = "PASSTHROUGH"
+  atime       = "OFF"
 }
 
 resource "truenas_dataset" "immich" {
@@ -61,6 +63,8 @@ resource "truenas_dataset" "immich" {
   parent      = truenas_dataset.apps.id
   pool_id     = truenas_pool.storage.pool_id
   compression = "ZSTD"
+  acltype     = "NFSV4"
+  aclmode     = "PASSTHROUGH"
   atime       = "OFF"
 }
 

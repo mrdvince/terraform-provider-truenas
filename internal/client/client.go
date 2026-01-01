@@ -201,7 +201,7 @@ func (c *Client) Call(ctx context.Context, method string, params []any) (*Respon
 		return resp, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case <-time.After(30 * time.Second):
+	case <-time.After(120 * time.Second):
 		return nil, fmt.Errorf("timeout waiting for response to %s", method)
 	}
 }
